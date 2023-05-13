@@ -5,9 +5,13 @@ const Joi = require("joi");
 const { HttpError } = require("../../helpers");
 
 const addSchema = Joi.object({
-  name: Joi.string().required(),
-  email: Joi.string().required(),
-  phone: Joi.string().required(),
+  name: Joi.string().min(4).max(20).required(),
+  email: Joi.string().min(4).max(20).email().required(),
+  phone: Joi.string()
+    .min(4)
+    .max(50)
+    .pattern(/^\+|\d[\s\d\-\(\)]*\d$/)
+    .required(),
 });
 
 router.get("/", async (req, res, next) => {
