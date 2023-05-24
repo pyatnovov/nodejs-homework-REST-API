@@ -4,17 +4,24 @@ const router = express.Router();
 const isValidId = require("../../middlewares/isValidId");
 const { HttpError } = require("../../helpers");
 const { schems } = require("../../models/contacts");
+const authentication = require("../../middlewares/authentication");
 
-router.get("/", async (req, res, next) => {
+router.get("/", authentication, async (req, res, next) => {
   try {
-    const result = await Contact.find();
+    const { _id: owner } = req.user;
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
+    const result = await Contact.find({ owner }, "-createdAt -updatedAt", {
+      skip,
+      limit,
+    });
     res.status(200).json(result);
   } catch (error) {
     next(error);
   }
 });
 
-router.get("/:id", isValidId, async (req, res, next) => {
+router.get("/:id", authentication, isValidId, async (req, res, next) => {
   try {
     const { id } = req.params;
     const result = await Contact.findById(id);
@@ -27,7 +34,7 @@ router.get("/:id", isValidId, async (req, res, next) => {
   }
 });
 
-router.delete("/:id", isValidId, async (req, res, next) => {
+router.delete("/:id", authentication, isValidId, async (req, res, next) => {
   try {
     const { id } = req.params;
     const contactForRemove = await Contact.findByIdAndRemove(id);
@@ -40,19 +47,20 @@ router.delete("/:id", isValidId, async (req, res, next) => {
   }
 });
 
-router.post("/", async (req, res, next) => {
+router.post("/", authentication, async (req, res, next) => {
   try {
     const { error } = schems.addSchema.validate(req.body);
     if (error) {
       throw HttpError(400, { message: "missing required name field" });
     }
-    const result = await Contact.create(req.body);
+    const { _id: owner } = req.user;
+    const result = await Contact.create({ ...req.body, owner });
     res.status(201).json(result);
   } catch (error) {
     next(error);
   }
 });
-router.put("/:id", isValidId, async (req, res, next) => {
+router.put("/:id", authentication, isValidId, async (req, res, next) => {
   try {
     const { error } = schems.addSchema.validate(req.body);
     if (error) {
@@ -69,22 +77,29 @@ router.put("/:id", isValidId, async (req, res, next) => {
     next(error);
   }
 });
-router.patch("/:id/favorite", isValidId, async (req, res, next) => {
-  try {
-    const { error } = schems.updateFavoritSchema.validate(req.body);
-    if (error) {
-      throw HttpError(400, { message: "missing field favorite" });
-    }
-    const { id } = req.params;
-    const result = await Contact.findByIdAndUpdate(id, req.body, { new: true });
+router.patch(
+  "/:id/favorite",
+  authentication,
+  isValidId,
+  async (req, res, next) => {
+    try {
+      const { error } = schems.updateFavoritSchema.validate(req.body);
+      if (error) {
+        throw HttpError(400, { message: "missing field favorite" });
+      }
+      const { id } = req.params;
+      const result = await Contact.findByIdAndUpdate(id, req.body, {
+        new: true,
+      });
 
-    if (!result) {
-      throw HttpError(404, { message: "Not found" });
+      if (!result) {
+        throw HttpError(404, { message: "Not found" });
+      }
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
     }
-    res.status(200).json(result);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 module.exports = router;
