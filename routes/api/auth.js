@@ -6,6 +6,13 @@ const bcrypt = require("bcrypt");
 const { HttpError } = require("../../helpers");
 const { schems, User } = require("../../models/user");
 const authentication = require("../../middlewares/authentication");
+const fs = require("fs/promises");
+const gravatar = require("gravatar");
+const upload = require("../../middlewares/upload");
+const path = require("path");
+const Jimp = require("jimp");
+
+const avatarDir = path.join(__dirname, "../../", "public", "avatars");
 
 router.get("/", async (req, res, next) => {
   const result = await User.find();
@@ -24,7 +31,7 @@ router.post("/register", async (req, res, next) => {
   try {
     const { error } = schems.registerSchema.validate(req.body);
     if (error) {
-      throw HttpError(400, { message });
+      throw HttpError(400, { message: "Validation error" });
     }
 
     const { email, password } = req.body;
@@ -34,8 +41,13 @@ router.post("/register", async (req, res, next) => {
       throw HttpError(409, { message: "Email already in use" });
     }
     const hashPassword = await bcrypt.hash(password, 10);
+    const avatarURL = gravatar.url(email);
 
-    const newUser = await User.create({ ...req.body, password: hashPassword });
+    const newUser = await User.create({
+      ...req.body,
+      password: hashPassword,
+      avatarURL,
+    });
     res.status(201).json({
       email: newUser.email,
       subscription: newUser.subscription,
@@ -78,5 +90,31 @@ router.post("/logout", authentication, async (req, res) => {
     message: "Logout success",
   });
 });
+
+router.patch(
+  "/avatars",
+  authentication,
+  upload.single("avatar"),
+  async (req, res) => {
+    const { _id } = req.user;
+    const { path: tempUpload, originalname } = req.file;
+    const filename = `${_id}_${originalname}`;
+    const resultUpload = path.join(avatarDir, filename);
+    await fs.rename(tempUpload, resultUpload);
+    const avatarURL = path.join("avatars", filename);
+    try {
+      const avatar = await Jimp.read(resultUpload);
+      await avatar.resize(250, 250).write(resultUpload);
+
+      await User.findByIdAndUpdate(_id, { avatarURL });
+
+      res.json({
+        avatarURL,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  }
+);
 
 module.exports = router;

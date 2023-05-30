@@ -6,6 +6,7 @@ const { HttpError } = require("../../helpers");
 const { schems } = require("../../models/contacts");
 const authentication = require("../../middlewares/authentication");
 const upload = require("../../middlewares/upload");
+const fs = require("fs");
 router.get("/", authentication, async (req, res, next) => {
   try {
     const { _id: owner } = req.user;
@@ -47,24 +48,19 @@ router.delete("/:id", authentication, isValidId, async (req, res, next) => {
   }
 });
 
-router.post(
-  "/",
-  upload.single("word"),
-  authentication,
-  async (req, res, next) => {
-    try {
-      const { error } = schems.addSchema.validate(req.body);
-      if (error) {
-        throw HttpError(400, { message: "missing required name field" });
-      }
-      const { _id: owner } = req.user;
-      const result = await Contact.create({ ...req.body, owner });
-      res.status(201).json(result);
-    } catch (error) {
-      next(error);
+router.post("/", authentication, async (req, res, next) => {
+  try {
+    const { error } = schems.addSchema.validate(req.body);
+    if (error) {
+      throw HttpError(400, { message: "missing required name field" });
     }
+    const { _id: owner } = req.user;
+    const result = await Contact.create({ ...req.body, owner });
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
   }
-);
+});
 router.put("/:id", authentication, isValidId, async (req, res, next) => {
   try {
     const { error } = schems.addSchema.validate(req.body);
