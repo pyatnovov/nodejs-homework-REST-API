@@ -5,7 +5,8 @@ const isValidId = require("../../middlewares/isValidId");
 const { HttpError } = require("../../helpers");
 const { schems } = require("../../models/contacts");
 const authentication = require("../../middlewares/authentication");
-
+const upload = require("../../middlewares/upload");
+const fs = require("fs");
 router.get("/", authentication, async (req, res, next) => {
   try {
     const { _id: owner } = req.user;
