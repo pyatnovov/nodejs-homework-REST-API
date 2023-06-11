@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
-const { SECRET_KEY } = require("../../config");
+const { SECRET_KEY, PROJECT_URL } = require("../../config");
 const bcrypt = require("bcrypt");
-const { HttpError } = require("../../helpers");
+const { HttpError, SendEmail, sendEmail } = require("../../helpers");
 const { schems, User } = require("../../models/user");
 const authentication = require("../../middlewares/authentication");
 const fs = require("fs/promises");
@@ -11,6 +11,7 @@ const gravatar = require("gravatar");
 const upload = require("../../middlewares/upload");
 const path = require("path");
 const Jimp = require("jimp");
+const { nanoid } = require("nanoid");
 
 const avatarDir = path.join(__dirname, "../../", "public", "avatars");
 
@@ -41,13 +42,22 @@ router.post("/register", async (req, res, next) => {
       throw HttpError(409, { message: "Email already in use" });
     }
     const hashPassword = await bcrypt.hash(password, 10);
+    const verificationCode = nanoid();
     const avatarURL = gravatar.url(email);
 
     const newUser = await User.create({
       ...req.body,
       password: hashPassword,
       avatarURL,
+      verificationCode,
     });
+    const verifyEmail = {
+      to: email,
+      subject: "Varify email",
+      html: `<a target="_blank" href="${PROJECT_URL}/user/auth/verify/${verificationCode}"></a>`,
+    };
+    await sendEmail(verifyEmail);
+
     res.status(201).json({
       email: newUser.email,
       subscription: newUser.subscription,
